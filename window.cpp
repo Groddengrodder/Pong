@@ -34,8 +34,8 @@ const float BallWidth = 0.08;
 const float BallHeight = BallWidth * ((float)window_width) / window_height;
 const float BallPos_x = 0;
 const float BallPos_y = 0;
-const float BallSpeed_x = 0.05;
-const float BallSpeed_y = 0.05 * ((float)window_width) / window_height;
+const float BallSpeed_x = 0.01;
+const float BallSpeed_y = 0.01 * ((float)window_width) / window_height;
 const float BallColor[3] = {1., 1., 1.};
 
 Ball game_ball = Ball(BallPos_x, BallPos_y, BallSpeed_x, BallSpeed_y, BallWidth, BallHeight);
@@ -184,7 +184,6 @@ void BallCollision(Ball &ball, Player player) {
     }
 
     if (inRange(ball, player, 0) && inRange(ball, player, 1)) {
-        ball.vy *= -1;
         ball.vx *= -1;
     }
 }
