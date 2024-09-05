@@ -34,15 +34,15 @@ const float BallWidth = 0.08;
 const float BallHeight = BallWidth * ((float)window_width) / window_height;
 const float BallPos_x = 0;
 const float BallPos_y = 0;
-const float BallSpeed_x = 0.02;
-const float BallSpeed_y = 0.02 * ((float)window_width) / window_height;
+const float BallSpeed_x = 0.05;
+const float BallSpeed_y = 0.05 * ((float)window_width) / window_height;
 const float BallColor[3] = {1., 1., 1.};
 
 Ball game_ball = Ball(BallPos_x, BallPos_y, BallSpeed_x, BallSpeed_y, BallWidth, BallHeight);
 
-Player player_left = Player(true, x_offset - 1, -PlayerHeight / 2, 0, PlayerWidth,
+Player player_left = Player(false, x_offset - 1, -PlayerHeight / 2, 0, PlayerWidth,
                             ((float)window_width) / window_height * PlayerHeight);
-Player player_right = Player(true, 1 - x_offset - PlayerWidth, -PlayerHeight / 2, 0, PlayerWidth,
+Player player_right = Player(false, 1 - x_offset - PlayerWidth, -PlayerHeight / 2, 0, PlayerWidth,
                              ((float)window_width) / window_height * PlayerHeight);
 
 // sollte den square shader bekommen
@@ -122,6 +122,14 @@ bool hitWall(Ball ball, uint comp) {
     return false;
 }
 
+bool hitWallPlayer(Player player) {
+    if ((player.y <= -1 && player.v < 0) || (player.y + player.height >= 1 && player.v > 0)) {
+        return true;
+    }
+
+    return false;
+}
+
 bool inRange(Ball ball, Player player, uint comp) {
     if ((ball.x + ball.width >= player.x && ball.x <= player.x + player.width) && comp == 0) {
         return true;
@@ -174,6 +182,11 @@ void BallCollision(Ball &ball, Player player) {
             ball.vy *= -1;
         }
     }
+
+    if (inRange(ball, player, 0) && inRange(ball, player, 1)) {
+        ball.vy *= -1;
+        ball.vx *= -1;
+    }
 }
 
 void AiAction(Ball test_ball, Player *player) {
@@ -216,8 +229,6 @@ void AiAction(Ball test_ball, Player *player) {
     if (inRange(test_ball, newPlayer, 1)) {
         player->v = 0;
     }
-
-    drawBall(test_ball, *shader);
 }
 
 int main(int argc, char *argv[]) {
@@ -269,8 +280,13 @@ int main(int argc, char *argv[]) {
         game_ball.x += game_ball.vx;
         game_ball.y += game_ball.vy;
 
-        player_left.y += player_left.v;
-        player_right.y += player_right.v;
+        if (!hitWallPlayer(player_left)) {
+            player_left.y += player_left.v;
+        }
+
+        if (!hitWallPlayer(player_right)) {
+            player_right.y += player_right.v;
+        }
 
         drawBall(game_ball, circle);
 
@@ -281,6 +297,9 @@ int main(int argc, char *argv[]) {
 
         glfwPollEvents();
     }
+
+    printf("score left: %u  ", player_left.score);
+    printf("score right: %u\n", player_right.score);
 
     glfwDestroyWindow(window);
     glfwTerminate();
