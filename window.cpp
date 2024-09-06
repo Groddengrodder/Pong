@@ -7,8 +7,6 @@
 #include "VertexBuffer.h"
 #include <unistd.h>
 
-typedef enum { NONE, LEFT, RIGHT, UP, DOWN } dir;
-
 GLFWwindow *window;
 const GLuint window_width = 1120;
 const GLuint window_height = 630;
@@ -27,15 +25,15 @@ const float bg_height = 2;
 const float x_offset = 0.1;
 const float PlayerWidth = 0.07;
 const float PlayerHeight = 0.25;
-const float PlayerSpeed = 0.05;
+const float PlayerSpeed = 0.1; // 0.05
 const float PlayerColor[3] = {1., 1., 1.};
 
 const float BallWidth = 0.08;
 const float BallHeight = BallWidth * ((float)window_width) / window_height;
 const float BallPos_x = 0;
 const float BallPos_y = 0;
-const float BallSpeed_x = 0.01;
-const float BallSpeed_y = 0.01 * ((float)window_width) / window_height;
+const float BallSpeed_x = 0.1;
+const float BallSpeed_y = 0.1 * ((float)window_width) / window_height;
 const float BallColor[3] = {1., 1., 1.};
 
 Ball game_ball = Ball(BallPos_x, BallPos_y, BallSpeed_x, BallSpeed_y, BallWidth, BallHeight);
@@ -131,60 +129,54 @@ bool hitWallPlayer(Player player) {
 }
 
 bool inRange(Ball ball, Player player, uint comp) {
-    if ((ball.x + ball.width >= player.x && ball.x <= player.x + player.width) && comp == 0) {
+    if ((ball.x + ball.width > player.x && ball.x < player.x + player.width) && comp == 0) {
         return true;
     }
 
-    if ((ball.y + ball.height >= player.y && ball.y <= player.y + player.height) && comp == 1) {
+    if ((ball.y + ball.height > player.y && ball.y < player.y + player.height) && comp == 1) {
         return true;
     }
 
     return false;
 }
 
-dir hitPlayer(Ball ball, Player player, uint comp) {
-    if (comp == 0 && inRange(ball, player, 1)) {
-        if (ball.x <= player.x + player.width && ball.x >= player.x && ball.vx < 0) {
-            return RIGHT;
-        }
-
-        if (ball.x + ball.width >= player.x && ball.x + ball.width <= player.x + player.width &&
-            ball.vx > 0) {
-            return LEFT;
-        }
-    } else if (comp == 1 && inRange(ball, player, 0)) {
-        if (ball.y <= player.y + player.height && ball.y >= player.y && ball.vy < 0) {
-            return UP;
-        }
-
-        if (ball.y + ball.height >= player.y && ball.y + ball.height <= player.y + player.height &&
-            ball.vy > 0) {
-            return DOWN;
-        }
-    }
-
-    return NONE;
-}
-
 void BallCollision(Ball &ball, Player player) {
-    Ball nextBall = ball;
-    nextBall.x += nextBall.vx;
-    nextBall.y += nextBall.vy;
+    Ball lastBall = ball;
+    lastBall.x -= ball.vx;
+    lastBall.y -= ball.vy;
 
-    if (!inRange(ball, player, 0)) {
-        if (hitPlayer(nextBall, player, 0) == LEFT || hitPlayer(nextBall, player, 0) == RIGHT) {
-            ball.vx *= -1;
+    Ball testBall = ball;
+    float inc = window_width > window_height ? 2. / window_width : 2. / window_height;
+    float v = sqrt(pow(ball.vx, 2) + pow(ball.vy, 2));
+    testBall.vx = inc * ball.vx / v;
+    testBall.vy = inc * ball.vy / v;
+
+    while (true) {
+        if (inRange(testBall, player, 0) && inRange(testBall, player, 1)) {
+            if (!inRange(lastBall, player, 0)) {
+                ball.vx *= -1;
+                ball.x = ball.vx > 0 ? player.x + player.width : player.x - ball.width;
+            }
+
+            if (!inRange(lastBall, player, 1)) {
+                ball.vy *= -1;
+                ball.y = ball.vy > 0 ? player.y + player.height : player.y - ball.height;
+            }
+
+            if (inRange(lastBall, player, 0) && inRange(lastBall, player, 1)) {
+                ball.vx *= -1;
+                ball.x = ball.vx > 0 ? player.x + player.width : player.x - ball.width;
+            }
+
+            break;
         }
-    }
 
-    if (!inRange(ball, player, 1)) {
-        if (hitPlayer(nextBall, player, 1) == UP || hitPlayer(nextBall, player, 1) == DOWN) {
-            ball.vy *= -1;
+        testBall.x -= testBall.vx;
+        testBall.y -= testBall.vy;
+
+        if (testBall.x * ball.vx < lastBall.x * ball.vx) {
+            break;
         }
-    }
-
-    if (inRange(ball, player, 0) && inRange(ball, player, 1)) {
-        ball.vx *= -1;
     }
 }
 
@@ -198,18 +190,24 @@ void AiAction(Ball test_ball, Player *player) {
             break;
         }
 
-        if (hitWall(test_ball, 0)) {
-            test_ball.vx *= -1;
-        }
-
-        if (hitWall(test_ball, 1)) {
-            test_ball.vy *= -1;
-        }
+        test_ball.x += test_ball.vx;
+        test_ball.y += test_ball.vy;
 
         BallCollision(test_ball, player == &player_left ? player_right : player_left);
 
-        test_ball.x += test_ball.vx;
-        test_ball.y += test_ball.vy;
+        if (hitWall(test_ball, 0)) {
+            float last_x = test_ball.x;
+            test_ball.vx *= -1;
+            test_ball.x = test_ball.vx > 0 ? -1 : 1 - test_ball.width;
+            test_ball.y -= (test_ball.x - last_x) * (test_ball.vy / test_ball.vx);
+        }
+
+        if (hitWall(test_ball, 1)) {
+            float last_y = test_ball.y;
+            test_ball.vy *= -1;
+            test_ball.y = test_ball.vy > 0 ? -1 : 1 - test_ball.height;
+            test_ball.x -= (test_ball.y - last_y) * (test_ball.vx / test_ball.vy);
+        }
     }
 
     if (test_ball.y > player->y + player->height) {
@@ -251,31 +249,6 @@ int main(int argc, char *argv[]) {
         square.bind();
         drawRect(bg_position, bg_color, bg_width, bg_height);
 
-        if (hitWall(game_ball, 0)) {
-            if (game_ball.vx < 0) {
-                player_left.score += 1;
-            } else if (game_ball.vx > 0) {
-                player_right.score += 1;
-            }
-
-            game_ball.vx *= -1;
-        }
-
-        if (hitWall(game_ball, 1)) {
-            game_ball.vy *= -1;
-        }
-
-        BallCollision(game_ball, player_left);
-        BallCollision(game_ball, player_right);
-
-        if (!player_left.control) {
-            AiAction(game_ball, &player_left);
-        }
-
-        if (!player_right.control) {
-            AiAction(game_ball, &player_right);
-        }
-
         game_ball.x += game_ball.vx;
         game_ball.y += game_ball.vy;
 
@@ -285,6 +258,37 @@ int main(int argc, char *argv[]) {
 
         if (!hitWallPlayer(player_right)) {
             player_right.y += player_right.v;
+        }
+
+        BallCollision(game_ball, player_left);
+        BallCollision(game_ball, player_right);
+
+        if (hitWall(game_ball, 0)) {
+            if (game_ball.vx < 0) {
+                player_right.score += 1;
+            } else if (game_ball.vx > 0) {
+                player_left.score += 1;
+            }
+
+            float last_x = game_ball.x;
+            game_ball.vx *= -1;
+            game_ball.x = game_ball.vx > 0 ? -1 : 1 - game_ball.width;
+            game_ball.y -= (game_ball.x - last_x) * (game_ball.vy / game_ball.vx);
+        }
+
+        if (hitWall(game_ball, 1)) {
+            float last_y = game_ball.y;
+            game_ball.vy *= -1;
+            game_ball.y = game_ball.vy > 0 ? -1 : 1 - game_ball.height;
+            game_ball.x -= (game_ball.y - last_y) * (game_ball.vx / game_ball.vy);
+        }
+
+        if (!player_left.control) {
+            AiAction(game_ball, &player_left);
+        }
+
+        if (!player_right.control) {
+            AiAction(game_ball, &player_right);
         }
 
         drawBall(game_ball, circle);
